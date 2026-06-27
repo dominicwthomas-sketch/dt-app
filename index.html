@@ -352,6 +352,9 @@
   .bizstat:active{cursor:grabbing}
   .bizstat.dragging{opacity:.5}
   .bizstat.drop-left{box-shadow:inset 3px 0 0 var(--accent2)}
+  .dgdrag{opacity:.9;transform:scale(1.015);box-shadow:0 10px 26px rgba(0,0,0,.4);position:relative;z-index:6;touch-action:none}
+  body.dgactive{-webkit-user-select:none;user-select:none;touch-action:none;cursor:grabbing}
+  [data-dg]{touch-action:pan-y}
   .bizname{font:inherit;color:var(--txt);background:transparent;border:1px solid transparent;border-radius:7px;padding:2px 7px;margin:-2px -7px;width:100%}
   .bizname:focus{border-color:var(--accent2);background:var(--bg);outline:none}
   .hrow.locked{padding-top:6px;padding-bottom:6px}
@@ -778,6 +781,8 @@ function migrate(d){
   return d;
 }
 function save(){localStorage.setItem(KEY,JSON.stringify(data));if(window.cloudPush)window.cloudPush();}
+window.DRAGH=window.DRAGH||{};
+window.DRAGH.nw=function(keys,item){const g=item.getAttribute('data-dgg');if(!g||!data.netWorth[g])return;const old=data.netWorth[g].slice();const seen={},next=[];keys.forEach(i=>{const v=old[+i];if(v!==undefined&&!seen[i]){seen[i]=1;next.push(v);}});old.forEach((v,i)=>{if(!seen[i])next.push(v);});data.netWorth[g]=next;save();renderNetWorth();};
 window.__reloaders=window.__reloaders||[];window.__reloaders.push(function(){try{const s=localStorage.getItem(KEY);if(s)data=migrate(JSON.parse(s));}catch(e){}renderAll();});
 const gbp=n=>'£'+(Math.round(n)).toLocaleString('en-GB');
 const gbp2=n=>'£'+Number(n).toLocaleString('en-GB',{minimumFractionDigits:2,maximumFractionDigits:2});
@@ -1043,7 +1048,7 @@ function renderNetWorth(){
     return`<div class="panel" ondragover="catDragOver(event,${gi})" ondrop="catDrop(event,${gi})" ondragleave="catDragLeave(event)"><div class="panel-head">
       <h2><span class="cathandle" draggable="true" ondragstart="catDragStart(event,${gi})" ondragend="catDragEnd(event)" title="Drag to reorder category">⠿</span><span style="display:inline-block;width:9px;height:9px;border-radius:3px;background:${cm[g]};margin-right:8px"></span><input class="catname" style="width:${Math.max(6,g.length+1)}ch" value="${esc(g)}" onchange="renameCategory('${g}',this.value)" title="Edit category name"></h2>
       <span class="meta">${gbp2(tot)} <button class="del" onclick="delCategory('${g}')" title="Remove category">×</button></span></div>
-      <table><tbody>${items.map((a,i)=>`<tr ondragover="nwDragOver(event,'${g}',${i})" ondrop="nwDrop(event,'${g}',${i})" ondragleave="nwDragLeave(event)">
+      <table><tbody>${items.map((a,i)=>`<tr data-dg="nw" data-dk="${i}" data-dgg="${esc(g)}" ondragover="nwDragOver(event,'${g}',${i})" ondrop="nwDrop(event,'${g}',${i})" ondragleave="nwDragLeave(event)">
         <td class="handle" draggable="true" ondragstart="nwDragStart(event,'${g}',${i})" ondragend="nwDragEnd(event)" title="Drag to reorder">⠿</td>
         <td><input class="cell" value="${esc(a.name)}" onchange="updNW('${g}',${i},'name',this.value)"></td>
         <td class="num" style="width:170px"><span class="poundcell"><input class="cell num" value="${a.amount}" onchange="updNW('${g}',${i},'amount',this.value)"></span></td>
@@ -1142,6 +1147,11 @@ function odLoad(){
 }
 let odata=odLoad();
 function osave(){localStorage.setItem(ORG_KEY,JSON.stringify(odata));if(window.cloudPush)window.cloudPush();}
+window.DRAGH=window.DRAGH||{};
+window.DRAGH.daily=function(keys){const old=odata.daily.slice();const seen={};const next=[];keys.forEach(i=>{const v=old[+i];if(v!==undefined&&!seen[i]){seen[i]=1;next.push(v);}});old.forEach((v,i)=>{if(!seen[i])next.push(v);});odata.daily=next;osave();suppressFocus=true;renderToday();suppressFocus=false;};
+window.DRAGH.task=function(keys){if(!keys.length)return;let col=null;for(const c of odata.board.order){if((odata.board.lists[c]||[]).some(x=>keys.indexOf(x.id)>=0)){col=c;break;}}if(!col)return;const list=odata.board.lists[col],map={};list.forEach(c=>map[c.id]=c);const re=[];keys.forEach(id=>{if(map[id]){re.push(map[id]);delete map[id];}});list.forEach(c=>{if(map[c.id])re.push(c);});odata.board.lists[col]=re;osave();renderProjects();};
+window.DRAGH.goal=function(keys){const arr=odata.goalsV2||[];const idxs=keys.map(id=>arr.findIndex(g=>g.id===id)).filter(i=>i>=0).sort((a,b)=>a-b);const items=keys.map(id=>arr.find(g=>g.id===id)).filter(Boolean);idxs.forEach((slot,k)=>{if(items[k])arr[slot]=items[k];});osave();renderGoals();};
+window.DRAGH.biz=function(keys){const arr=odata.businesses||[];const idxs=keys.map(n=>arr.indexOf(n)).filter(i=>i>=0).sort((a,b)=>a-b);idxs.forEach((slot,k)=>{arr[slot]=keys[k];});osave();renderBoard();};
 window.__reloaders=window.__reloaders||[];window.__reloaders.push(function(){odata=odLoad();renderOrg();});
 
 function dayKey(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
@@ -1278,7 +1288,7 @@ function renderToday(){
   doFocus();
 }
 function habitRow(i){const h=odata.daily[i];const d=habitDone(h);
-  return `<div class="hrow ${d?'done':''}" ondragover="habitOver(event,${i})" ondrop="habitDrop(event,${i})">
+  return `<div class="hrow ${d?'done':''}" data-dg="daily" data-dk="${i}" ondragover="habitOver(event,${i})" ondrop="habitDrop(event,${i})">
     <span class="hgrip" draggable="true" ondragstart="habitDragStart(event,${i})" ondragend="habitDragEnd(event)" title="Drag to reorder">⠿</span>
     <span class="chk ${d?'on':''}" onclick="toggleDailyAt(${i})"></span>
     <span class="htext" contenteditable="true" onblur="editDaily(${i},this.innerText)">${esc(h)}</span>
@@ -1343,7 +1353,7 @@ function projOver(e,i){if(pDrag===null)return;e.preventDefault();const p=e.curre
 function clearProjMarks(){document.querySelectorAll('.proj').forEach(p=>p.classList.remove('drop-top','drop-bot'));}
 function projDrop(e,i){if(pDrag===null)return;e.preventDefault();clearProjMarks();if(pDrag!==i){const m=odata.board.order.splice(pDrag,1)[0];odata.board.order.splice(i,0,m);osave();renderProjects();}pDrag=null;}
 
-function taskRow(c,gi,noCheck){const sec=getSection(odata.board.order[gi]);return `<div class="task ${c.done?'done':''} ${c.doing?'doing':''} ${c.note?'has-note':''}" data-id="${c.id}" ondragover="taskOver(event,'${c.id}')" ondrop="taskDrop(event,${gi},'${c.id}')">
+function taskRow(c,gi,noCheck){const sec=getSection(odata.board.order[gi]);return `<div class="task ${c.done?'done':''} ${c.doing?'doing':''} ${c.note?'has-note':''}" data-id="${c.id}" data-dg="task" data-dk="${c.id}" ondragover="taskOver(event,'${c.id}')" ondrop="taskDrop(event,${gi},'${c.id}')">
   <span class="tgrip" draggable="true" ondragstart="taskDragStart(event,'${c.id}',${gi})" ondragend="taskDragEnd(event)">⠿</span>
   ${noCheck?'':`<span class="tchk ${c.done?'on':''}" onclick="toggleCardDone('${c.id}')"></span>`}
   <span class="ttext ${c.done?'done':''}" contenteditable="true" onblur="editCard('${c.id}',this.innerText)">${esc(c.text)}</span>
@@ -1408,7 +1418,7 @@ function renderBoard(){
   }).join('')+'</div>';}
   const otherIdx=odata.board.order.map((c,i)=>i).filter(i=>getSection(odata.board.order[i])==='business'&&!bizs.includes(odata.board.order[i]));
   const other=otherIdx.length?`<div class="osec" style="margin-top:24px;opacity:.65">Other lists</div>`+otherIdx.map(i=>projPanel(i)).join(''):'';
-  const stats=shown.length?`<div class="bizstats">${shown.map(b=>{const cs=odata.board.lists[b]||[];const op=cs.length,doing=cs.filter(c=>c.doing).length;return `<div class="panel bizstat" draggable="true" ondragstart="bizDragStart(event,'${jb(b)}')" ondragend="bizDragEnd(event)" ondragover="bizOver(event,'${jb(b)}')" ondrop="bizDrop(event,'${jb(b)}')" title="Drag to reorder"><div class="bsnum">${op}</div><div class="bsinfo"><div class="bsname">${esc(b)}</div><div class="bssub">${op?`open task${op===1?'':'s'}${doing?` · ${doing} in progress`:''}`:'No tasks yet'}</div></div></div>`;}).join('')}</div>`:'';
+  const stats=shown.length?`<div class="bizstats">${shown.map(b=>{const cs=odata.board.lists[b]||[];const op=cs.length,doing=cs.filter(c=>c.doing).length;return `<div class="panel bizstat" data-dg="biz" data-dk="${esc(b)}" data-axis="x" title="Hold and drag to reorder"><div class="bsnum">${op}</div><div class="bsinfo"><div class="bsname">${esc(b)}</div><div class="bssub">${op?`open task${op===1?'':'s'}${doing?` · ${doing} in progress`:''}`:'No tasks yet'}</div></div></div>`;}).join('')}</div>`:'';
   el.innerHTML=stats+sel+cols+other;
   doFocus();
 }
@@ -1545,7 +1555,7 @@ function goalCard(g,locked){
       <div class="goal-row"><span class="goal-pct">${pct}%</span>${detail}</div></div>`;
   }
   const doneToggle=(!(g.target>0)&&!editing)?`<span class="chk ${g.done?'on':''}" onclick="toggleGoalDone('${g.id}')" title="Mark done"></span>`:'';
-  return `<div class="panel goalcard ${complete?'complete':''}" ondragover="goalOver(event,'${g.id}')" ondrop="goalDrop(event,'${g.id}')">
+  return `<div class="panel goalcard ${complete?'complete':''}" data-dg="goal" data-dk="${g.id}" ondragover="goalOver(event,'${g.id}')" ondrop="goalDrop(event,'${g.id}')">
     <div class="goal-top"><span class="ggrip" draggable="true" ondragstart="goalDragStart(event,'${g.id}')" ondragend="goalDragEnd(event)" title="Drag to reorder">⠿</span>${doneToggle}<span class="goal-title" data-gid="${g.id}" contenteditable="true" onblur="editGoalField('${g.id}','title',this.innerText)">${esc(g.title)}</span><span class="goal-del" onclick="delGoal2('${g.id}')">✕</span></div>
     <div class="goal-progwrap"><div class="goal-prog" style="width:${pct}%"></div></div>
     <div class="goal-row"><span class="goal-pct">${pct}%</span>${detail}</div></div>`;
@@ -1653,6 +1663,8 @@ function gLoad(){let d;try{const s=localStorage.getItem(GYM_KEY);if(s)d=JSON.par
   return d;}
 let gdata=gLoad();
 function gsave(){localStorage.setItem(GYM_KEY,JSON.stringify(gdata));if(window.cloudPush)window.cloudPush();}
+window.DRAGH=window.DRAGH||{};
+window.DRAGH.program=function(keys){const arr=gdata.programs||[],map={};arr.forEach(p=>map[p.id]=p);const re=[];keys.forEach(id=>{if(map[id]){re.push(map[id]);delete map[id];}});arr.forEach(p=>{if(map[p.id])re.push(p);});gdata.programs=re;gsave();renderPrograms();renderTrain();};
 window.__reloaders=window.__reloaders||[];window.__reloaders.push(function(){gdata=gLoad();renderGym();});
 function gToday(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
 function gFmt(s){const d=new Date(s+'T00:00');return d.toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'});}
@@ -1763,7 +1775,7 @@ function renderPrograms(){
     const liftRow=o=>`<div class="hrow"><span class="htext" contenteditable="true" onblur="editProgEx('${p.id}',${o.i},'name',this.innerText)">${esc(o.ex.name)}</span>${single?opt(o,'','setsA','repsA'):opt(o,'A','setsA','repsA')+opt(o,'B','setsB','repsB')}<span class="rowx" onclick="delProgEx('${p.id}',${o.i})">✕</span></div>`;
     const coreRow=o=>`<div class="hrow"><span class="htext" contenteditable="true" onblur="editProgEx('${p.id}',${o.i},'name',this.innerText)">${esc(o.ex.name)}</span><span class="gset"><input class="gnum" value="${esc(o.ex.mins)}" placeholder="min" onchange="editProgEx('${p.id}',${o.i},'mins',this.value)">min</span><span class="rowx" onclick="delProgEx('${p.id}',${o.i})">✕</span></div>`;
     const open=!!(gdata.progOpen&&gdata.progOpen[p.id]);
-    return `<div class="panel gprogpanel ${open?'open':''}" ondragover="gpOver(event,${pidx})" ondrop="gpDrop(event,${pidx})"><div class="panel-head" onclick="if(!event.target.closest('input,.rowx,.gpgrip'))toggleProgCollapse('${p.id}')">
+    return `<div class="panel gprogpanel ${open?'open':''}" data-dg="program" data-dk="${p.id}" ondragover="gpOver(event,${pidx})" ondrop="gpDrop(event,${pidx})"><div class="panel-head" onclick="if(!event.target.closest('input,.rowx,.gpgrip'))toggleProgCollapse('${p.id}')">
       <span class="gpgrip" draggable="true" ondragstart="gpDragStart(event,${pidx})" ondragend="gpEnd(event)" title="Drag to reorder">⠿</span>
       <span class="gpchev">▾</span>
       <h2 style="flex:1"><input class="proj-name" value="${esc(p.name)}" onclick="event.stopPropagation()" onchange="editProgram('${p.id}','name',this.value)"></h2>
@@ -2022,6 +2034,47 @@ function calClose(){const b=document.getElementById('calBack');if(b)b.classList.
 
 renderCal();
 (function(){var a=localStorage.getItem('currentApp')||'org';if(typeof switchApp==='function')switchApp(a);if(typeof activateAppTab==='function')activateAppTab(a,false);})();
+</script>
+
+<script>
+/* ============ DRAG-ANYWHERE REORDER (touch + mouse, press-hold) ============ */
+(function(){
+  var EXCLUDE='input,textarea,select,button,a,[contenteditable="true"],[draggable="true"],.chk,.tchk,.rowx,.tx,.tflag,.tnotebtn,.ttoday,.proj-del,.bizdel,.goal-del,.goal-tgtdel,.goal-tgtval,.goal-stepper,.proj-move,.proj-chev,.gcal-nav,.qnav,.del,.glink,.gcomplete';
+  var holdT=null,pend=null,drag=null,sx=0,sy=0,axis='y';
+  function sibs(el){var g=el.getAttribute('data-dg'),p=el.parentNode;if(!p)return [el];return Array.prototype.filter.call(p.children,function(c){return c.nodeType===1&&c.getAttribute&&c.getAttribute('data-dg')===g;});}
+  function clearPend(){if(holdT){clearTimeout(holdT);holdT=null;}pend=null;}
+  function onDown(e){
+    if(e.pointerType==='mouse'&&e.button!==0)return;
+    var t=e.target;if(!t||!t.closest)return;
+    if(t.closest(EXCLUDE))return;
+    var item=t.closest('[data-dg]');if(!item)return;
+    pend=item;sx=e.clientX;sy=e.clientY;axis=item.getAttribute('data-axis')==='x'?'x':'y';
+    holdT=setTimeout(function(){holdT=null;begin(item);},370);
+  }
+  function begin(item){drag=item;item.classList.add('dgdrag');document.body.classList.add('dgactive');try{navigator.vibrate&&navigator.vibrate(8);}catch(x){}}
+  function onMove(e){
+    if(pend&&!drag){if(Math.abs(e.clientX-sx)>9||Math.abs(e.clientY-sy)>9)clearPend();return;}
+    if(!drag)return;
+    e.preventDefault();
+    var list=sibs(drag),p=axis==='x'?e.clientX:e.clientY,before=null;
+    for(var i=0;i<list.length;i++){var s=list[i];if(s===drag)continue;var r=s.getBoundingClientRect();var mid=axis==='x'?r.left+r.width/2:r.top+r.height/2;if(p<mid){before=s;break;}}
+    if(before){if(drag.nextSibling!==before)drag.parentNode.insertBefore(drag,before);}
+    else{var last=list[list.length-1];if(last&&last!==drag)drag.parentNode.appendChild(drag);}
+  }
+  function onUp(){
+    if(drag){var item=drag;drag=null;item.classList.remove('dgdrag');document.body.classList.remove('dgactive');
+      var g=item.getAttribute('data-dg');var keys=sibs(item).map(function(s){return s.getAttribute('data-dk');});
+      var sup=function(ev){ev.stopPropagation();ev.preventDefault();document.removeEventListener('click',sup,true);};
+      document.addEventListener('click',sup,true);setTimeout(function(){document.removeEventListener('click',sup,true);},350);
+      if(window.DRAGH&&window.DRAGH[g]){try{window.DRAGH[g](keys,item);}catch(err){}}
+    }
+    clearPend();
+  }
+  document.addEventListener('pointerdown',onDown,true);
+  document.addEventListener('pointermove',onMove,{passive:false});
+  document.addEventListener('pointerup',onUp,true);
+  document.addEventListener('pointercancel',function(){if(drag){drag.classList.remove('dgdrag');document.body.classList.remove('dgactive');drag=null;}clearPend();},true);
+})();
 </script>
 
 <script>
