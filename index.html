@@ -387,10 +387,15 @@
   .gdatebar input{font-family:inherit;font-size:13px;color:var(--txt);background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:6px 10px}
   .gdatebar .meta{font-size:12.5px;color:var(--muted)}
   .gtiles{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:8px;padding:10px 15px 16px}
+  @media(max-width:600px){
+    .gtiles{grid-auto-columns:minmax(58px,1fr);overflow-x:auto;-webkit-overflow-scrolling:touch}
+    table{display:block;overflow-x:auto;white-space:nowrap;-webkit-overflow-scrolling:touch}
+    .wrap{padding:18px 14px 70px}
+  }
   .gtile{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:11px 10px;display:flex;flex-direction:column;gap:9px;min-height:66px;justify-content:space-between;transition:border-color .15s,transform .15s}
   .gtile-go,.gtile.empty{cursor:pointer}
   .gtile-go:hover,.gtile.empty:hover{border-color:var(--accent);transform:translateY(-1px)}
-  .gt-name{font-weight:650;font-size:13px;letter-spacing:-.2px;line-height:1.2;word-break:break-word}
+  .gt-name{font-weight:760;font-size:16px;letter-spacing:.2px;line-height:1.1;text-align:center}
   .gt-start{font-size:12px;color:var(--accent);font-weight:600}
   .gt-ab{display:flex;gap:5px}
   .gt-ab button{flex:1;font-family:inherit;font-size:12px;font-weight:700;border:1px solid var(--line);background:var(--panel);color:var(--txt);border-radius:8px;padding:5px;cursor:pointer;transition:.12s}
@@ -1238,14 +1243,6 @@ function renderToday(){
   const dstr=new Date().toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long'});
   const left=tot-done;const hr=new Date().getHours();
   const greeting=(hr<12?'Good morning':hr<18?'Good afternoon':'Good evening')+', Dominic';
-  const tnow=new Date();if(!lCalMonth)lCalMonth=new Date(tnow.getFullYear(),tnow.getMonth(),1);
-  const lcm=lCalMonth.getMonth(),lcy=lCalMonth.getFullYear();
-  const lcFirst=new Date(lcy,lcm,1),lcStart=new Date(lcFirst);lcStart.setDate(lcFirst.getDate()-((lcFirst.getDay()+6)%7));
-  let lcells='';for(let i=0;i<42;i++){const d=new Date(lcStart);d.setDate(lcStart.getDate()+i);const k=dayKey(d),inM=d.getMonth()===lcm,isT=k===todayKey(),st=dayTaskState(k);const dot=st===2?'<span class="ldot full"></span>':st===1?'<span class="ldot part"></span>':'';lcells+=`<div class="lcell ${inM?'':'other'} ${isT?'today':''} ${st===2?'full':''}">${d.getDate()}${dot}</div>`;}
-  const lcalHtml=`<div class="panel lcalpanel"><div class="panel-head"><h2>${lCalMonth.toLocaleDateString('en-GB',{month:'long',year:'numeric'})}</h2><span class="gcal-nav"><button onclick="lCalNav(-1)">‹</button><button onclick="lCalNav(1)">›</button></span></div>
-    <div class="lcal"><div class="lcal-dows"><div>M</div><div>T</div><div>W</div><div>T</div><div>F</div><div>S</div><div>S</div></div>
-      <div class="lcal-grid">${lcells}</div>
-      <div class="lcal-legend"><span><i style="background:var(--accent)"></i> All tasks done</span><span><i style="background:transparent;border:1.6px solid var(--muted)"></i> Partial</span></div></div></div>`;
   document.getElementById('o-today').innerHTML=`
     <div class="ltop"><div class="panel jhero">
       <div class="jring" style="--p:${pct}"><div class="jring-c"><div class="jbig">${pct}%</div><div class="jsmall">today</div></div></div>
@@ -1258,7 +1255,7 @@ function renderToday(){
           <div class="lstat"><div class="lstat-n ${tot&&left===0?'pos':''}">${left}</div><div class="lstat-l">tasks left</div></div>
         </div>
       </div>
-    </div>${quoteCardHTML()}${lcalHtml}</div>
+    </div>${quoteCardHTML()}</div>
     <div class="panel"><div class="panel-head"><h2>Daily tasks</h2></div>
       ${odata.daily.map((h,i)=>habitRow(i)).join('')}
       ${pinRows}
@@ -1681,6 +1678,7 @@ function renderGym(){
 /* ---- train / sessions ---- */
 function getSession(id){return gdata.sessions.find(s=>s.id===id);}
 function hasB(p){return p&&!p.single&&p.exercises.some(e=>!e.core&&((e.repsB&&e.repsB!=='')||(e.setsB&&e.setsB!=='')||(e.weightB&&e.weightB!=='')));}
+function gabbr(n){const parts=String(n||'').trim().split(/\s+/).filter(Boolean);if(!parts.length)return '';const a=parts.map(p=>/^\d+$/.test(p)?p:(p.length<=1?p.toUpperCase():p[0].toUpperCase())).join('');return a||String(n).slice(0,2).toUpperCase();}
 function startSession(pid,variant){variant=variant==='B'?'B':'A';const p=pid?gdata.programs.find(x=>x.id===pid):null;
   const ordered=p?[...p.exercises.filter(e=>!e.core&&(e.group||'main')==='main'),...p.exercises.filter(e=>!e.core&&e.group==='arms'),...p.exercises.filter(e=>e.core)]:[];
   gdata.sessions.unshift({id:guid(),date:gToday(),done:false,name:(p?p.name:'Workout')+((p&&hasB(p))?' '+variant:''),note:(p?p.note||'':''),exercises:ordered.map(ex=>ex.core?({id:guid(),name:ex.name,core:true,mins:ex.mins||''}):({id:guid(),name:ex.name,weight:'',reps:(variant==='B'?ex.repsB:ex.repsA)||'',sets:(variant==='B'?ex.setsB:ex.setsA)||''}))});
@@ -1718,8 +1716,8 @@ function renderTrain(){
   const active=sessions.filter(s=>!s.done), doneS=sessions.filter(s=>s.done);
   const rides=gdata.watt.slice().sort((a,b)=>b.date.localeCompare(a.date)).slice(0,6);
   const tiles=gdata.programs.map(p=>hasB(p)
-    ?`<div class="gtile"><span class="gt-name">${esc(p.name)}</span><div class="gt-ab"><button onclick="startSession('${p.id}','A')">A</button><button onclick="startSession('${p.id}','B')">B</button></div></div>`
-    :`<div class="gtile gtile-go" onclick="startSession('${p.id}','A')"><span class="gt-name">${esc(p.name)}</span></div>`).join('');
+    ?`<div class="gtile" title="${esc(p.name)}"><span class="gt-name">${esc(gabbr(p.name))}</span><div class="gt-ab"><button onclick="startSession('${p.id}','A')">A</button><button onclick="startSession('${p.id}','B')">B</button></div></div>`
+    :`<div class="gtile gtile-go" onclick="startSession('${p.id}','A')" title="${esc(p.name)}"><span class="gt-name">${esc(gabbr(p.name))}</span></div>`).join('');
   el.innerHTML=`
     <div class="panel"><div class="panel-head"><h2>Weight Session</h2></div>
       <div class="gtiles">${tiles}</div></div>
@@ -1844,15 +1842,6 @@ function renderProgress(){
   const maxWk=Math.max(1,...wk.map(w=>w.n));
   const recent=acts.slice().sort((a,b)=>b.date.localeCompare(a.date)).slice(0,8);
   const pct=v=>Math.round(v*100);
-  if(!gProgMonth)gProgMonth=new Date(now.getFullYear(),now.getMonth(),1);
-  const dayMap={};acts.forEach(a=>{(dayMap[a.date]=dayMap[a.date]||{w:false,r:false})[a.type==='ride'?'r':'w']=true;});
-  const cm=gProgMonth.getMonth(),cy=gProgMonth.getFullYear();
-  const cfirst=new Date(cy,cm,1),cstart=new Date(cfirst);cstart.setDate(cfirst.getDate()-((cfirst.getDay()+6)%7));
-  let ccells='';for(let i=0;i<42;i++){const d=new Date(cstart);d.setDate(cstart.getDate()+i);const k=gKey(d),inM=d.getMonth()===cm,isT=k===gToday(),a=dayMap[k];const dots=a?`${a.w?'<span class="cd w"></span>':''}${a.r?'<span class="cd r"></span>':''}`:'';ccells+=`<div class="gcell ${inM?'':'other'} ${isT?'today':''}">${d.getDate()}<span class="gdots">${dots}</span></div>`;}
-  const calHtml=`<div class="panel gcalpanel"><div class="panel-head"><h2>${gProgMonth.toLocaleDateString('en-GB',{month:'short',year:'2-digit'})}</h2><span class="gcal-nav"><button onclick="gCalNav(-1)">‹</button><button onclick="gCalNav(1)">›</button></span></div>
-    <div class="gcal"><div class="gcal-dows"><div>M</div><div>T</div><div>W</div><div>T</div><div>F</div><div>S</div><div>S</div></div>
-      <div class="gcal-grid">${ccells}</div>
-      <div class="gcal-legend"><span><i style="background:var(--accent)"></i> Weights</span><span><i style="background:var(--accent2)"></i> Wattbike</span></div></div></div>`;
   el.innerHTML=`
     <div class="panel jhero">
       <div class="jring" style="--p:${level}"><div class="jring-c"><div class="jbig">${level}%</div><div class="jsmall">of potential</div></div></div>
@@ -1872,8 +1861,8 @@ function renderProgress(){
     <div class="panel"><div class="panel-head"><h2>What's driving your score</h2></div>
       <div class="jpillars">${pillars.map(p=>`<div class="jpillar"><div class="pn"><b>${p[0]} <span class="ginfo" onclick="showInfo(event,'${p[0].toLowerCase()}')">i</span></b><span>${p[2]}</span></div><div class="pbar"><span style="width:${pct(p[1])}%"></span></div><div class="pv">${pct(p[1])}%</div></div>`).join('')}</div>
       <div class="jhow"><details><summary>How your % is calculated</summary><p>Your potential is a weighted blend of four pillars: <b>Consistency</b> — your last-8-week average vs 5 sessions/week (elite), 30%. <b>Volume</b> — total workouts over the rolling last 12 months vs ~250 (a full year at 5/week), 30%. <b>Momentum</b> — this week vs a 6-workout week, 20%. <b>Longevity</b> — distinct weeks you trained at least once in the last 12 months vs 52, 20%. Hitting 100% needs elite weekly frequency, hundreds of sessions banked, a huge current week, and a year-plus of showing up — by design, not easy. Every completed session and Wattbike ride feeds all four.</p></details></div></div>
-    <div class="gcalrow">${calHtml}<div class="panel gmompanel"><div class="panel-head"><h2>Momentum <span class="ginfo" onclick="showInfo(event,'momgraph')">i</span></h2><span class="meta">8 weeks · full box = 6</span></div>
-      <div class="jmom">${wk.map(w=>{const h=Math.min(100,Math.round(w.n/6*100));return `<div class="jmom-col"><div class="jmom-val">${w.n}</div><div class="jmom-track" title="${w.n} workout${w.n===1?'':'s'}"><div class="jmom-bar" style="height:${h}%"></div></div><div class="jmom-lab">${w.label}</div></div>`;}).join('')}</div></div></div>
+    <div class="panel gmompanel"><div class="panel-head"><h2>Momentum <span class="ginfo" onclick="showInfo(event,'momgraph')">i</span></h2><span class="meta">8 weeks · full box = 6</span></div>
+      <div class="jmom">${wk.map(w=>{const h=Math.min(100,Math.round(w.n/6*100));return `<div class="jmom-col"><div class="jmom-val">${w.n}</div><div class="jmom-track" title="${w.n} workout${w.n===1?'':'s'}"><div class="jmom-bar" style="height:${h}%"></div></div><div class="jmom-lab">${w.label}</div></div>`;}).join('')}</div></div>
     <div class="panel"><div class="panel-head"><h2>Recent activity</h2><span class="meta">${total} logged</span></div>
       ${recent.length?recent.map((a,i)=>`<div class="actrow${i>0&&a.date!==recent[i-1].date?' daysep':''}"><span class="jicon ${a.type}"></span><span style="flex:1">${esc(a.name)}</span><span class="gtag">${gFmt(a.date)}</span></div>`).join(''):'<div class="reminder" style="text-align:center;padding:24px">No completed workouts yet. Finish a session on the Train page (hit Complete) and it lands here — your journey starts with one.</div>'}</div>`;
 }
