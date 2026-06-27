@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>DT</title>
 <link rel="apple-touch-icon" href="icon.png">
 <link rel="icon" href="icon.png">
@@ -252,6 +252,12 @@
   .tx{opacity:0;color:var(--muted);cursor:pointer;font-size:14px;flex-shrink:0}
   .task:hover .tx{opacity:.45} .tx:hover{opacity:1!important;color:var(--red)}
   .taskadd{width:100%;font-family:inherit;font-size:13.5px;color:var(--txt);background:transparent;border:none;border-top:1px solid var(--line);padding:10px 15px;outline:none}
+  .addbar{display:flex;align-items:stretch;border-top:1px solid var(--line)}
+  .addbar>.addinput,.addbar>.taskadd{flex:1;border-top:none;width:auto;min-width:0}
+  .addgo{flex:0 0 auto;width:46px;border:none;border-left:1px solid var(--line);background:transparent;color:var(--accent2);font-size:22px;font-weight:600;cursor:pointer;line-height:1;padding:0}
+  .addgo:active,.addgo:hover{background:var(--panel2)}
+  .gex-add.addbar{padding:0}
+  .gex-add.addbar>.addinput{padding:8px 15px}
   .taskadd::placeholder{color:var(--muted)}
   .projadd{width:100%;border:1px dashed var(--line);background:transparent;color:var(--muted);border-radius:14px;padding:14px;cursor:pointer;font-size:13.5px}
   .projadd:hover{border-color:var(--accent2);color:var(--txt)}
@@ -611,12 +617,14 @@
         <button class="appdd-item" data-app="org" onclick="chooseApp('org')" role="menuitem"><span>Life</span><span class="appdd-tick">✓</span></button>
         <button class="appdd-item" data-app="gym" onclick="chooseApp('gym')" role="menuitem"><span>Fitness</span><span class="appdd-tick">✓</span></button>
         <button class="appdd-item" data-app="finance" onclick="chooseApp('finance')" role="menuitem"><span>Finances</span><span class="appdd-tick">✓</span></button>
+        <button class="appdd-item" data-app="elite" onclick="chooseApp('elite')" role="menuitem"><span>Potential</span><span class="appdd-tick">✓</span></button>
       </div>
     </div>
   </div>
 </div>
 <div id="app-org" class="wrap"></div>
 <div id="app-gym" class="wrap"></div>
+<div id="app-elite" class="wrap"></div>
 <div id="app-finance" class="wrap">
   <header>
     <h1><span class="dot"></span>Finances</h1>
@@ -1107,8 +1115,9 @@ const APP_KEY='currentApp';
 let oid=1;
 function uid(){return 'c'+(oid++)+'_'+Date.now().toString(36);}
 
+const CORE_DAILY=['Walk','Eat Apple','Gym','Drink 3.7L Water','Night Skincare','Read book (10 Pages)','Clean Diet'];
 const ORG_DEFAULT={
-  daily:['Walk','Wattbike & Stretch','Eat Apple','Gym','Drink 3.7L Water','Golf Practice','Night Skincare','Read TAGR (10 pages)','Clean Diet'],
+  daily:CORE_DAILY.slice(),
   morning:['Visualisations','Press Ups / Calf Raises','Give Thanks','AG1','Water 800ml','Multivitamin / Vit D / Omega 3'],
   log:{},
   principles:['Check In On Loved Ones','Be Honest In All Capacities','Always Do Night Skincare',"Don't Speak Negative On Others",'Swear Less','Be Punctual','Be A Better Listener','Go On Phone Less'],
@@ -1129,6 +1138,7 @@ function odLoad(){
   try{const s=localStorage.getItem(ORG_KEY);if(s)d=JSON.parse(s);}catch(e){}
   if(!d)d=structuredClone(ORG_DEFAULT);
   d.daily=d.daily||[];d.morning=d.morning||[];d.log=d.log||{};d.principles=d.principles||[];
+  if(!d.dailyCoreV1){d.daily=d.daily.map(t=>t==='Read TAGR (10 pages)'?'Read book (10 Pages)':t);Object.keys(d.log).forEach(k=>{if(d.log[k]&&d.log[k]['Read TAGR (10 pages)']){d.log[k]['Read book (10 Pages)']=true;delete d.log[k]['Read TAGR (10 pages)'];}});d.dailyCoreV1=true;}
   if(!d.board)d.board=structuredClone(ORG_DEFAULT.board);
   if(!d.goals)d.goals=structuredClone(ORG_DEFAULT.goals);
   d.board.order.forEach(col=>{d.board.lists[col]=(d.board.lists[col]||[]).map(c=>typeof c==='string'?{id:uid(),text:c}:c);});
@@ -1153,10 +1163,13 @@ window.DRAGH.daily=function(keys){const old=odata.daily.slice();const seen={};co
 window.DRAGH.task=function(keys){if(!keys.length)return;let col=null;for(const c of odata.board.order){if((odata.board.lists[c]||[]).some(x=>keys.indexOf(x.id)>=0)){col=c;break;}}if(!col)return;const list=odata.board.lists[col],map={};list.forEach(c=>map[c.id]=c);const re=[];keys.forEach(id=>{if(map[id]){re.push(map[id]);delete map[id];}});list.forEach(c=>{if(map[c.id])re.push(c);});odata.board.lists[col]=re;osave();renderProjects();};
 window.DRAGH.goal=function(keys){const arr=odata.goalsV2||[];const idxs=keys.map(id=>arr.findIndex(g=>g.id===id)).filter(i=>i>=0).sort((a,b)=>a-b);const items=keys.map(id=>arr.find(g=>g.id===id)).filter(Boolean);idxs.forEach((slot,k)=>{if(items[k])arr[slot]=items[k];});osave();renderGoals();};
 window.DRAGH.biz=function(keys){const arr=odata.businesses||[];const idxs=keys.map(n=>arr.indexOf(n)).filter(i=>i>=0).sort((a,b)=>a-b);idxs.forEach((slot,k)=>{arr[slot]=keys[k];});osave();renderBoard();};
+function addGo(btn){var inp=btn.previousElementSibling;while(inp&&inp.tagName!=='INPUT')inp=inp.previousElementSibling;if(!inp)return;if(!String(inp.value||'').trim()){inp.focus();return;}var ev;try{ev=new KeyboardEvent('keydown',{key:'Enter',bubbles:true,cancelable:true});}catch(e){ev=document.createEvent('Event');ev.initEvent('keydown',true,true);ev.key='Enter';}inp.dispatchEvent(ev);}
+window.addGo=addGo;
 window.__reloaders=window.__reloaders||[];window.__reloaders.push(function(){odata=odLoad();renderOrg();});
 
 function dayKey(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
 function todayKey(){return dayKey(new Date());}
+function dailyRollover(){if(odata.dailyDay===todayKey())return;odata.daily=(odata.daily||[]).filter(t=>CORE_DAILY.indexOf(t)>=0);CORE_DAILY.forEach(c=>{if(odata.daily.indexOf(c)<0)odata.daily.push(c);});odata.dailyDay=todayKey();osave();}
 function allHabits(){return odata.daily.slice();}
 function habitDone(h,k){k=k||todayKey();return !!(odata.log[k]&&odata.log[k][h]);}
 function toggleHabit(h){const k=todayKey();if(!odata.log[k])odata.log[k]={};if(odata.log[k][h])delete odata.log[k][h];else odata.log[k][h]=true;osave();renderOrg();}
@@ -1169,7 +1182,7 @@ let lCalMonth=null;
 function lCalNav(delta){if(!lCalMonth)lCalMonth=new Date();lCalMonth=new Date(lCalMonth.getFullYear(),lCalMonth.getMonth()+delta,1);renderToday();}
 
 /* ---- app switching ---- */
-const APPS={org:{el:'app-org',label:'Life'},gym:{el:'app-gym',label:'Fitness'},finance:{el:'app-finance',label:'Finances'}};
+const APPS={org:{el:'app-org',label:'Life'},gym:{el:'app-gym',label:'Fitness'},finance:{el:'app-finance',label:'Finances'},elite:{el:'app-elite',label:'Potential'}};
 function switchApp(which){
   if(!APPS[which])which='org';
   Object.keys(APPS).forEach(k=>{const e=document.getElementById(APPS[k].el);if(e)e.classList.toggle('hidden',k!==which);});
@@ -1177,6 +1190,7 @@ function switchApp(which){
   document.querySelectorAll('.appdd-item').forEach(it=>it.classList.toggle('active',it.dataset.app===which));
   localStorage.setItem(APP_KEY,which);window.scrollTo(0,0);
   if(which==='gym'&&typeof renderGym==='function')renderGym();
+  if(which==='elite'&&typeof renderElite==='function')renderElite();
 }
 function toggleAppDD(e){e.stopPropagation();const dd=document.getElementById('appdd');const open=dd.classList.toggle('open');
   if(open)setTimeout(()=>document.addEventListener('click',closeAppDD),0);else document.removeEventListener('click',closeAppDD);}
@@ -1253,6 +1267,7 @@ function loadQuotePortrait(){const q=dailyQuote();if(!q||!q.wiki)return;
   fetch('https://en.wikipedia.org/api/rest_v1/page/summary/'+encodeURIComponent(q.wiki)).then(r=>r.json()).then(j=>{const u=j&&j.thumbnail&&j.thumbnail.source;quotePortraitCache[q.wiki]=u||false;if(u){const el=document.getElementById('qPortrait');if(el)el.innerHTML='<img src="'+u+'" alt="">';}}).catch(()=>{quotePortraitCache[q.wiki]=false;});}
 
 function renderToday(){
+  dailyRollover();
   const hb=allHabits(),done=hb.filter(h=>habitDone(h)).length,tot=hb.length;
   const pct=tot?Math.round(done/tot*100):0;
   const streak=allDoneStreak();
@@ -1277,7 +1292,7 @@ function renderToday(){
     <div class="panel"><div class="panel-head"><h2>Daily tasks</h2></div>
       ${odata.daily.map((h,i)=>habitRow(i)).join('')}
       ${pinRows}
-      <input class="addinput" data-h="daily" placeholder="+ Add a daily task" onkeydown="habitKey(event,this)"></div>
+      <div class="addbar"><input class="addinput" data-h="daily" placeholder="+ Add a daily task" onkeydown="habitKey(event,this)"><button class="addgo" onclick="addGo(this)" title="Add">+</button></div></div>
     ${odata.board.order.map((c,i)=>i).filter(i=>getSection(odata.board.order[i])==='today').map(i=>projPanel(i)).join('')}
     <div class="grid2" style="margin-top:2px">
       <div class="panel faded"><div class="panel-head"><h2>Morning routine</h2></div>
@@ -1396,7 +1411,7 @@ function projPanel(gi){
         <span class="proj-del" onclick="delColAt(${gi})" title="Delete">✕</span></span></div>
     <div class="proj-body" ondragover="bodyOver(event)" ondrop="bodyDrop(event,${gi})">
       ${cards.map(c=>taskRow(c,gi)).join('')}
-      <input class="taskadd" data-col="${gi}" placeholder="+ Add a task" onkeydown="addCardInput(event,${gi},this)"></div>
+      <div class="addbar"><input class="taskadd" data-col="${gi}" placeholder="+ Add a task" onkeydown="addCardInput(event,${gi},this)"><button class="addgo" onclick="addGo(this)" title="Add">+</button></div></div>
   </div>`;
 }
 function renderBoard(){
@@ -1415,7 +1430,7 @@ function renderBoard(){
       <div class="panel-head"><h2 style="flex:1"><input class="bizname" value="${esc(b)}" onchange="renameBusiness('${jb(b)}',this.value)"></h2>
         <span class="proj-meta"><span class="bizdel" onclick="delBusiness('${jb(b)}')" title="Remove business">✕</span></span></div>
       ${cards.map(c=>taskRow(c,gi,true)).join('')}
-      <input class="taskadd" data-biz="${esc(b)}" placeholder="+ Add a to-do" onkeydown="addBizTask(event,this,'${jb(b)}')"></div>`;
+      <div class="addbar"><input class="taskadd" data-biz="${esc(b)}" placeholder="+ Add a to-do" onkeydown="addBizTask(event,this,'${jb(b)}')"><button class="addgo" onclick="addGo(this)" title="Add">+</button></div></div>`;
   }).join('')+'</div>';}
   const otherIdx=odata.board.order.map((c,i)=>i).filter(i=>getSection(odata.board.order[i])==='business'&&!bizs.includes(odata.board.order[i]));
   const other=otherIdx.length?`<div class="osec" style="margin-top:24px;opacity:.65">Other lists</div>`+otherIdx.map(i=>projPanel(i)).join(''):'';
@@ -1463,21 +1478,21 @@ function renderPersonal(){
       </div>
     </div></div>`;
   const cardsFlat=[];idx.forEach(i=>{(odata.board.lists[odata.board.order[i]]||[]).forEach(c=>cardsFlat.push({c,gi:i}));});
-  const todos=`<div class="osec">Personal to-do list</div><div class="panel">${cardsFlat.map(o=>taskRow(o.c,o.gi)).join('')}<input class="taskadd" data-personal="1" placeholder="+ Add a to-do" onkeydown="addPersonalTask(event,this)"></div>`;
+  const todos=`<div class="osec">Personal to-do list</div><div class="panel">${cardsFlat.map(o=>taskRow(o.c,o.gi)).join('')}<div class="addbar"><input class="taskadd" data-personal="1" placeholder="+ Add a to-do" onkeydown="addPersonalTask(event,this)"><button class="addgo" onclick="addGo(this)" title="Add">+</button></div></div>`;
   const orders=`<div class="osec">Orders${ordersOpen?`<span class="osec-meta">${ordersOpen} open</span>`:''}</div><div class="panel">${odata.orders.map(it=>simpleRow('orders',it)).join('')}
-      <input class="addinput" data-simple="orders" placeholder="+ Add an order" onkeydown="addSimple(event,'orders',this)"></div>`;
+      <div class="addbar"><input class="addinput" data-simple="orders" placeholder="+ Add an order" onkeydown="addSimple(event,'orders',this)"><button class="addgo" onclick="addGo(this)" title="Add">+</button></div></div>`;
   const returns=`<div class="osec">Returns${returnsOpen?`<span class="osec-meta">${returnsOpen} open</span>`:''}</div><div class="panel">${odata.returns.map(it=>simpleRow('returns',it)).join('')}
-      <input class="addinput" data-simple="returns" placeholder="+ Add a return" onkeydown="addSimple(event,'returns',this)"></div>`;
+      <div class="addbar"><input class="addinput" data-simple="returns" placeholder="+ Add a return" onkeydown="addSimple(event,'returns',this)"><button class="addgo" onclick="addGo(this)" title="Add">+</button></div></div>`;
   const refunds=`<div class="osec">Refunds${refundsOpen?`<span class="osec-meta">${refundsOpen} open</span>`:''}</div><div class="panel">${odata.refunds.map(it=>simpleRow('refunds',it)).join('')}
-      <input class="addinput" data-simple="refunds" placeholder="+ Add a refund" onkeydown="addSimple(event,'refunds',this)"></div>`;
+      <div class="addbar"><input class="addinput" data-simple="refunds" placeholder="+ Add a refund" onkeydown="addSimple(event,'refunds',this)"><button class="addgo" onclick="addGo(this)" title="Add">+</button></div></div>`;
   const reminders=`<div class="osec">Daily reminders</div>
     <div class="grid2">
       <div class="panel"><div class="panel-head"><h2>Morning routine</h2><span class="meta">${odata.morning.length} item${odata.morning.length===1?'':'s'}</span></div>
         ${odata.morning.map((p,i)=>reminderRow('morning',i)).join('')}
-        <input class="addinput" data-s="morning" placeholder="+ Add to routine" onkeydown="addStr(event,'morning',this)"></div>
+        <div class="addbar"><input class="addinput" data-s="morning" placeholder="+ Add to routine" onkeydown="addStr(event,'morning',this)"><button class="addgo" onclick="addGo(this)" title="Add">+</button></div></div>
       <div class="panel"><div class="panel-head"><h2>Self Improvements</h2><span class="meta">${odata.principles.length} item${odata.principles.length===1?'':'s'}</span></div>
         ${odata.principles.map((p,i)=>reminderRow('principles',i)).join('')}
-        <input class="addinput" data-s="principles" placeholder="+ Add a self improvement" onkeydown="addStr(event,'principles',this)"></div>
+        <div class="addbar"><input class="addinput" data-s="principles" placeholder="+ Add a self improvement" onkeydown="addStr(event,'principles',this)"><button class="addgo" onclick="addGo(this)" title="Add">+</button></div></div>
     </div>`;
   el.innerHTML=hero+todos+orders+returns+refunds+reminders;
   doFocus();
@@ -1610,7 +1625,7 @@ function renderOverview(){
 function updateAppDate(){const e=document.getElementById('appDate');if(!e)return;const n=new Date();const d=n.toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'});const t=n.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});e.textContent=d+' · '+t;}
 updateAppDate();setInterval(updateAppDate,15000);
 renderOrg();
-switchApp('org');
+switchApp('elite');
 </script>
 
 <script>
@@ -1619,16 +1634,19 @@ const GYM_KEY='gymAppData_v1';
 let gid=1;function guid(){return 'g'+(gid++)+'_'+Date.now().toString(36);}
 let gProgressEx=null,gProgMonth=null;
 function gCalNav(delta){if(!gProgMonth)gProgMonth=new Date();gProgMonth=new Date(gProgMonth.getFullYear(),gProgMonth.getMonth()+delta,1);renderProgress();}
+const HABITS_ELITE=['Drink 3.7L Water','Night Skincare','Clean Diet'];
+function eliteDiscipline(){if(typeof odata==='undefined'||!odata||!odata.log)return 0;var days=56,t=new Date(),sum=0;for(var i=0;i<days;i++){var d=new Date(t);d.setDate(t.getDate()-i);var k=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');var log=odata.log[k]||{},done=0;HABITS_ELITE.forEach(function(h){if(log[h])done++;});sum+=done/HABITS_ELITE.length;}return sum/days;}
 const GYM_INFO={
   workouts:'Workouts: completed weight sessions plus Wattbike rides done so far this calendar year.',
   week:'This week: workouts done since Monday. The figure below is your average workouts per week over the last 8 weeks.',
   active:'Active weeks: separate weeks in the last 12 months you trained at least once (out of 52). This feeds Longevity.',
   topotential:'To 100%: how far your Potential score has left to climb — 100 minus your current %.',
-  consistency:'Consistency (30% of score): your last-8-week average sessions per week vs 5/week (elite). Your recent rhythm.',
-  volume:'Volume (30% of score): total workouts in the rolling last 12 months vs ~250 (a year at 5/week).',
-  momentum:'Momentum (20% of score): this week vs 6 workouts (a full week). Resets every Monday, so it rewards effort right now.',
-  longevity:'Longevity (20% of score): distinct active weeks in the last 12 months vs 52 (never missing a week).',
-  potential:'Potential = 30% Consistency + 30% Volume + 20% Momentum + 20% Longevity. Reaching 100% is deliberately elite.',
+  consistency:'Consistency (25% of score): your last-8-week average sessions per week vs 5/week (elite). Your recent rhythm.',
+  volume:'Volume (25% of score): total workouts in the rolling last 12 months vs ~250 (a year at 5/week).',
+  momentum:'Momentum (15% of score): this week vs 6 workouts (a full week). Resets every Monday, so it rewards effort right now.',
+  longevity:'Longevity (15% of score): distinct active weeks in the last 12 months vs 52 (never missing a week).',
+  discipline:'Discipline (20% of score): how consistently you hit your three keystone habits — Drink Water, Night Skincare, Clean Diet — over the last 8 weeks. All three, every day, = full marks.',
+  potential:'Potential = 25% Consistency + 25% Volume + 15% Momentum + 15% Longevity + 20% Discipline. Reaching 100% is deliberately elite.',
   momgraph:'Momentum graph: the last 8 weeks. Each dashed box targets 6 workouts and the bar fills toward it. The number on top is the exact count; the current week is outlined.'
 };
 function showInfo(e,key){e.stopPropagation();let pop=document.getElementById('ginfopop');if(!pop){pop=document.createElement('div');pop.id='ginfopop';pop.className='ginfopop';document.body.appendChild(pop);}pop.textContent=GYM_INFO[key]||'';pop.style.display='block';const r=e.currentTarget.getBoundingClientRect();pop.style.top=(r.bottom+window.scrollY+6)+'px';pop.style.left=Math.max(8,Math.min(r.left+window.scrollX,window.innerWidth-282))+'px';setTimeout(()=>document.addEventListener('click',hideInfo),0);}
@@ -1678,11 +1696,9 @@ function renderGym(){
       <div class="otabs">
         <button class="otab active" data-g="g-train">Train</button>
         <button class="otab" data-g="g-programs">Weight Programs</button>
-        <button class="otab" data-g="g-progress">Progress</button>
       </div>
       <section class="oview active" id="g-train"></section>
-      <section class="oview" id="g-programs"></section>
-      <section class="oview" id="g-progress"></section>`;
+      <section class="oview" id="g-programs"></section>`;
     root.querySelectorAll('.otab').forEach(t=>t.onclick=()=>{
       root.querySelectorAll('.otab').forEach(x=>x.classList.remove('active'));
       root.querySelectorAll('.oview').forEach(x=>x.classList.remove('active'));
@@ -1693,7 +1709,12 @@ function renderGym(){
     });
     root.dataset.init='1';
   }
-  renderTrain();renderPrograms();renderProgress();
+  renderTrain();renderPrograms();
+}
+function renderElite(){
+  const root=document.getElementById('app-elite');if(!root)return;
+  if(!root.dataset.init){root.innerHTML=`<header><h1><span class="dot"></span>Potential</h1></header><div id="elite-main"></div>`;root.dataset.init='1';}
+  renderProgress();
 }
 
 /* ---- train / sessions ---- */
@@ -1726,7 +1747,7 @@ function sessionCard(s){return `<div class="panel gsesscard"><div class="panel-h
     <span class="proj-meta"><span class="gtag">${gFmt(s.date)}</span><span class="rowx" style="opacity:.4" onclick="delSession('${s.id}')">✕</span></span></div>
   ${s.note?`<div class="reminder" style="border-bottom:1px solid var(--line)">${esc(s.note)}</div>`:''}
   ${s.exercises.map(ex=>exerciseRow(s.id,ex,s)).join('')}
-  <div class="gex-add"><input class="addinput" style="border:none;padding:4px 0" placeholder="+ Add exercise" onkeydown="addExercise(event,'${s.id}',this)"></div>
+  <div class="gex-add addbar"><input class="addinput" style="border:none;padding:4px 0" placeholder="+ Add exercise" onkeydown="addExercise(event,'${s.id}',this)"><button class="addgo" onclick="addGo(this)" title="Add">+</button></div>
   <button class="gcomplete" onclick="completeSession('${s.id}')">✓ Complete session</button></div>`;}
 function completeSession(id){const s=getSession(id);if(s){s.done=true;gsave();renderTrain();renderProgress();toast('Session logged 💪');}}
 function reopenSession(id){const s=getSession(id);if(s){s.done=false;gsave();renderTrain();renderProgress();}}
@@ -1784,13 +1805,13 @@ function renderPrograms(){
       <div class="gprogbody">
       <div class="gprognote"><input value="${esc(p.note||'')}" onchange="editProgram('${p.id}','note',this.value)" placeholder="+ warm-up / notes"></div>
       ${main.map(liftRow).join('')}
-      <input class="addinput" placeholder="+ Add exercise" onkeydown="addProgEx(event,'${p.id}',this)">
+      <div class="addbar"><input class="addinput" placeholder="+ Add exercise" onkeydown="addProgEx(event,'${p.id}',this)"><button class="addgo" onclick="addGo(this)" title="Add">+</button></div>
       <div class="gcorehd">Arms</div>
       ${arms.map(liftRow).join('')}
-      <input class="addinput" placeholder="+ Add arms exercise" onkeydown="addProgArms(event,'${p.id}',this)">
+      <div class="addbar"><input class="addinput" placeholder="+ Add arms exercise" onkeydown="addProgArms(event,'${p.id}',this)"><button class="addgo" onclick="addGo(this)" title="Add">+</button></div>
       <div class="gcorehd">Core <span>· minutes</span></div>
       ${cores.map(coreRow).join('')}
-      <input class="addinput" placeholder="+ Add core exercise" onkeydown="addProgCore(event,'${p.id}',this)">
+      <div class="addbar"><input class="addinput" placeholder="+ Add core exercise" onkeydown="addProgCore(event,'${p.id}',this)"><button class="addgo" onclick="addGo(this)" title="Add">+</button></div>
       <button class="gprogsave" onclick="saveProgram('${p.id}')">✓ Save &amp; close</button></div></div>`;
   }).join('')+`<button class="projadd" onclick="addProgram()">+ Add program</button>`;
 }
@@ -1836,7 +1857,7 @@ function gChart(elId,pts,suffix){
   el.innerHTML=`<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet"><defs><linearGradient id="gg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="var(--accent)" stop-opacity=".22"/><stop offset="100%" stop-color="var(--accent)" stop-opacity="0"/></linearGradient></defs>${grid}<polyline points="${line}" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>${dots}${xl}</svg>`;
 }
 function renderProgress(){
-  const el=document.getElementById('g-progress');if(!el)return;
+  const el=document.getElementById('elite-main');if(!el)return;
   const completed=gdata.sessions.filter(s=>s.done);
   const rides=gdata.watt||[];
   const acts=[...completed.map(s=>({date:s.date,type:'weights',name:s.name})),...rides.map(w=>({date:w.date,type:'ride',name:'Wattbike'+(w.minutes?' · '+w.minutes+' min':'')+(w.distance?' · '+w.distance+'km':'')}))];
@@ -1852,11 +1873,11 @@ function renderProgress(){
   const wkset=new Set(acts.filter(a=>a.date>=yCutKey).map(a=>{const p=a.date.split('-').map(Number);const d=new Date(p[0],p[1]-1,p[2]);d.setDate(d.getDate()-((d.getDay()+6)%7));return gKey(d);}));
   const activeWeeks=wkset.size;
   const cl=x=>Math.max(0,Math.min(1,x));
-  const consistency=cl(avgWk/5),momentum=cl(thisWeek/6),volume=cl(yearCount/250),longevity=cl(activeWeeks/52);
-  const level=Math.round(100*(0.30*consistency+0.30*volume+0.20*momentum+0.20*longevity));
+  const consistency=cl(avgWk/5),momentum=cl(thisWeek/6),volume=cl(yearCount/250),longevity=cl(activeWeeks/52),discipline=cl(eliteDiscipline());
+  const level=Math.round(100*(0.25*consistency+0.25*volume+0.15*momentum+0.15*longevity+0.20*discipline));
   const togo=100-level;
   const band=level>=90?'World-class':level>=75?'Elite':level>=60?'Advanced':level>=40?'Committed':level>=20?'Developing':'Foundations';
-  const pillars=[['Consistency',consistency,'Last 8 wks vs 5/wk'],['Volume',volume,'Workouts in last 12 mths'],['Momentum',momentum,'This week · 6 sessions = full'],['Longevity',longevity,'Active weeks vs a year']];
+  const pillars=[['Consistency',consistency,'Last 8 wks vs 5/wk'],['Volume',volume,'Workouts in last 12 mths'],['Momentum',momentum,'This week · 6 sessions = full'],['Longevity',longevity,'Active weeks vs a year'],['Discipline',discipline,'Water · skincare · diet daily']];
   const weakest=pillars.slice().sort((a,b)=>a[1]-b[1])[0];
   const weeks=[];for(let i=7;i>=0;i--){const ws=new Date(monday);ws.setDate(monday.getDate()-i*7);weeks.push(ws);}
   const wk=weeks.map(ws=>{const k0=gKey(ws);const we=new Date(ws);we.setDate(ws.getDate()+7);const k1=gKey(we);return {label:ws.toLocaleDateString('en-GB',{day:'numeric',month:'short'}),n:acts.filter(a=>a.date>=k0&&a.date<k1).length};});
@@ -1877,11 +1898,11 @@ function renderProgress(){
       <div class="card"><div class="lbl">Workouts <span class="ginfo" onclick="showInfo(event,'workouts')">i</span></div><div class="val">${thisYear}</div><div class="sub">completed this year</div></div>
       <div class="card"><div class="lbl">This week <span class="ginfo" onclick="showInfo(event,'week')">i</span></div><div class="val ${thisWeek>0?'pos':''}">${thisWeek}</div><div class="sub">${avgWk.toFixed(1)}/wk avg over 8 wks</div></div>
       <div class="card"><div class="lbl">Active weeks <span class="ginfo" onclick="showInfo(event,'active')">i</span></div><div class="val">${activeWeeks}</div><div class="sub">of 52 for longevity</div></div>
-      <div class="card"><div class="lbl">To 100% <span class="ginfo" onclick="showInfo(event,'topotential')">i</span></div><div class="val">${togo}%</div><div class="sub">the climb continues</div></div>
+      <div class="card"><div class="lbl">Discipline <span class="ginfo" onclick="showInfo(event,'discipline')">i</span></div><div class="val ${pct(discipline)>=80?'pos':''}">${pct(discipline)}%</div><div class="sub">water · skincare · diet</div></div>
     </div>
     <div class="panel"><div class="panel-head"><h2>What's driving your score</h2></div>
       <div class="jpillars">${pillars.map(p=>`<div class="jpillar"><div class="pn"><b>${p[0]} <span class="ginfo" onclick="showInfo(event,'${p[0].toLowerCase()}')">i</span></b><span>${p[2]}</span></div><div class="pbar"><span style="width:${pct(p[1])}%"></span></div><div class="pv">${pct(p[1])}%</div></div>`).join('')}</div>
-      <div class="jhow"><details><summary>How your % is calculated</summary><p>Your potential is a weighted blend of four pillars: <b>Consistency</b> — your last-8-week average vs 5 sessions/week (elite), 30%. <b>Volume</b> — total workouts over the rolling last 12 months vs ~250 (a full year at 5/week), 30%. <b>Momentum</b> — this week vs a 6-workout week, 20%. <b>Longevity</b> — distinct weeks you trained at least once in the last 12 months vs 52, 20%. Hitting 100% needs elite weekly frequency, hundreds of sessions banked, a huge current week, and a year-plus of showing up — by design, not easy. Every completed session and Wattbike ride feeds all four.</p></details></div></div>
+      <div class="jhow"><details><summary>How your % is calculated</summary><p>Your potential is a weighted blend of five pillars: <b>Consistency</b> — last-8-week average vs 5 sessions/week (elite), 25%. <b>Volume</b> — total workouts over the rolling last 12 months vs ~250, 25%. <b>Momentum</b> — this week vs a 6-workout week, 15%. <b>Longevity</b> — distinct weeks trained in the last 12 months vs 52, 15%. <b>Discipline</b> — how reliably you hit your three keystone habits (Drink Water, Night Skincare, Clean Diet) over the last 8 weeks, 20%. Hitting 100% needs elite training frequency, hundreds of sessions banked, a huge current week, a year-plus of showing up, and near-perfect daily habits — by design, not easy.</p></details></div></div>
     <div class="panel gmompanel"><div class="panel-head"><h2>Momentum <span class="ginfo" onclick="showInfo(event,'momgraph')">i</span></h2><span class="meta">8 weeks · full box = 6</span></div>
       <div class="jmom">${wk.map(w=>{const h=Math.min(100,Math.round(w.n/6*100));return `<div class="jmom-col"><div class="jmom-val">${w.n}</div><div class="jmom-track" title="${w.n} workout${w.n===1?'':'s'}"><div class="jmom-bar" style="height:${h}%"></div></div><div class="jmom-lab">${w.label}</div></div>`;}).join('')}</div></div>
     <div class="panel"><div class="panel-head"><h2>Recent activity</h2><span class="meta">${total} logged</span></div>
@@ -2034,7 +2055,7 @@ function calDelete(){const id=document.getElementById('mId').value;if(!id)return
 function calClose(){const b=document.getElementById('calBack');if(b)b.classList.remove('show');}
 
 renderCal();
-(function(){if(typeof switchApp==='function')switchApp('org');if(typeof activateAppTab==='function')activateAppTab('org',true);})();
+(function(){if(typeof switchApp==='function')switchApp('elite');if(typeof activateAppTab==='function')activateAppTab('elite',true);})();
 </script>
 
 <script>
