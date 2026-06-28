@@ -43,6 +43,11 @@
   .tab{flex:1;min-width:120px;text-align:center;padding:9px 12px;border-radius:8px;font-size:13.5px;font-weight:550;
     color:var(--muted);background:transparent;border:none}
   .tab.active{background:var(--panel2);color:var(--txt);box-shadow:var(--shadow)}
+  @media(max-width:620px){
+    .tabs,.otabs{overflow:hidden}
+    .tab{min-width:0;padding:8px 4px;font-size:12px}
+    .otab{min-width:0;padding:8px 5px;font-size:12px}
+  }
   .view{display:none;animation:fade .25s ease}
   .view.active{display:block}
   @keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
@@ -364,6 +369,10 @@
   .dgchosen{box-shadow:0 12px 30px rgba(0,0,0,.45);position:relative;z-index:8}
   .dgdragging{opacity:.95;transform:scale(1.02)}
   [data-dg]{-webkit-touch-callout:none;cursor:grab}
+  @media (hover:none){
+    body{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+    input,textarea,select,[contenteditable="true"]{-webkit-user-select:text;user-select:text;-webkit-touch-callout:default}
+  }
   .bizname{font:inherit;color:var(--txt);background:transparent;border:1px solid transparent;border-radius:7px;padding:2px 7px;margin:-2px -7px;width:100%}
   .bizname:focus{border-color:var(--accent2);background:var(--bg);outline:none}
   .hrow.locked{padding-top:6px;padding-bottom:6px}
