@@ -11,6 +11,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="DT">
 <meta name="theme-color" content="#0f1419">
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.3/Sortable.min.js"></script>
 <style>
   :root{
     --bg:#0f1419; --panel:#161c24; --panel2:#1d242e; --line:#2a333f;
@@ -359,9 +360,10 @@
   .bizstat:active{cursor:grabbing}
   .bizstat.dragging{opacity:.5}
   .bizstat.drop-left{box-shadow:inset 3px 0 0 var(--accent2)}
-  .dgdrag{opacity:.9;transform:scale(1.015);box-shadow:0 10px 26px rgba(0,0,0,.4);position:relative;z-index:6;touch-action:none}
-  body.dgactive{-webkit-user-select:none;user-select:none;touch-action:none;cursor:grabbing}
-  [data-dg]{touch-action:pan-y}
+  .dgghost{opacity:.32}
+  .dgchosen{box-shadow:0 12px 30px rgba(0,0,0,.45);position:relative;z-index:8}
+  .dgdragging{opacity:.95;transform:scale(1.02)}
+  [data-dg]{-webkit-touch-callout:none;cursor:grab}
   .bizname{font:inherit;color:var(--txt);background:transparent;border:1px solid transparent;border-radius:7px;padding:2px 7px;margin:-2px -7px;width:100%}
   .bizname:focus{border-color:var(--accent2);background:var(--bg);outline:none}
   .hrow.locked{padding-top:6px;padding-bottom:6px}
@@ -1057,7 +1059,7 @@ function renderNetWorth(){
     return`<div class="panel" ondragover="catDragOver(event,${gi})" ondrop="catDrop(event,${gi})" ondragleave="catDragLeave(event)"><div class="panel-head">
       <h2><span class="cathandle" draggable="true" ondragstart="catDragStart(event,${gi})" ondragend="catDragEnd(event)" title="Drag to reorder category">⠿</span><span style="display:inline-block;width:9px;height:9px;border-radius:3px;background:${cm[g]};margin-right:8px"></span><input class="catname" style="width:${Math.max(6,g.length+1)}ch" value="${esc(g)}" onchange="renameCategory('${g}',this.value)" title="Edit category name"></h2>
       <span class="meta">${gbp2(tot)} <button class="del" onclick="delCategory('${g}')" title="Remove category">×</button></span></div>
-      <table><tbody>${items.map((a,i)=>`<tr data-dg="nw" data-dk="${i}" data-dgg="${esc(g)}" ondragover="nwDragOver(event,'${g}',${i})" ondrop="nwDrop(event,'${g}',${i})" ondragleave="nwDragLeave(event)">
+      <table><tbody data-sortable="nw">${items.map((a,i)=>`<tr data-dg="nw" data-dk="${i}" data-dgg="${esc(g)}" ondragover="nwDragOver(event,'${g}',${i})" ondrop="nwDrop(event,'${g}',${i})" ondragleave="nwDragLeave(event)">
         <td class="handle" draggable="true" ondragstart="nwDragStart(event,'${g}',${i})" ondragend="nwDragEnd(event)" title="Drag to reorder">⠿</td>
         <td><input class="cell" value="${esc(a.name)}" onchange="updNW('${g}',${i},'name',this.value)"></td>
         <td class="num" style="width:170px"><span class="poundcell"><input class="cell num" value="${a.amount}" onchange="updNW('${g}',${i},'amount',this.value)"></span></td>
@@ -1165,6 +1167,10 @@ window.DRAGH.goal=function(keys){const arr=odata.goalsV2||[];const idxs=keys.map
 window.DRAGH.biz=function(keys){const arr=odata.businesses||[];const idxs=keys.map(n=>arr.indexOf(n)).filter(i=>i>=0).sort((a,b)=>a-b);idxs.forEach((slot,k)=>{arr[slot]=keys[k];});osave();renderBoard();};
 function addGo(btn){var inp=btn.previousElementSibling;while(inp&&inp.tagName!=='INPUT')inp=inp.previousElementSibling;if(!inp)return;if(!String(inp.value||'').trim()){inp.focus();return;}var ev;try{ev=new KeyboardEvent('keydown',{key:'Enter',bubbles:true,cancelable:true});}catch(e){ev=document.createEvent('Event');ev.initEvent('keydown',true,true);ev.key='Enter';}inp.dispatchEvent(ev);}
 window.addGo=addGo;
+function dgEdit(el){if(!el||el.getAttribute('contenteditable')==='true')return;el.setAttribute('contenteditable','true');el.focus();
+  try{var r=document.createRange();r.selectNodeContents(el);r.collapse(false);var s=window.getSelection();s.removeAllRanges();s.addRange(r);}catch(e){}
+  el.addEventListener('blur',function bl(){el.setAttribute('contenteditable','false');el.removeEventListener('blur',bl);},{once:true});}
+window.dgEdit=dgEdit;
 window.__reloaders=window.__reloaders||[];window.__reloaders.push(function(){odata=odLoad();renderOrg();});
 
 function dayKey(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
@@ -1289,7 +1295,7 @@ function renderToday(){
         </div>
       </div>
     </div>${quoteCardHTML()}</div>
-    <div class="panel"><div class="panel-head"><h2>Daily tasks</h2></div>
+    <div class="panel" data-sortable="daily"><div class="panel-head"><h2>Daily tasks</h2></div>
       ${odata.daily.map((h,i)=>habitRow(i)).join('')}
       ${pinRows}
       <div class="addbar"><input class="addinput" data-h="daily" placeholder="+ Add a daily task" onkeydown="habitKey(event,this)"><button class="addgo" onclick="addGo(this)" title="Add">+</button></div></div>
@@ -1307,7 +1313,7 @@ function habitRow(i){const h=odata.daily[i];const d=habitDone(h);
   return `<div class="hrow ${d?'done':''}" data-dg="daily" data-dk="${i}" ondragover="habitOver(event,${i})" ondrop="habitDrop(event,${i})">
     <span class="hgrip" draggable="true" ondragstart="habitDragStart(event,${i})" ondragend="habitDragEnd(event)" title="Drag to reorder">⠿</span>
     <span class="chk ${d?'on':''}" onclick="toggleDailyAt(${i})"></span>
-    <span class="htext" contenteditable="true" onblur="editDaily(${i},this.innerText)">${esc(h)}</span>
+    <span class="htext" onclick="dgEdit(this)" onblur="editDaily(${i},this.innerText)">${esc(h)}</span>
     <span class="rowx" onclick="delDaily(${i})">✕</span></div>`;}
 function toggleDailyAt(i){toggleHabit(odata.daily[i]);}
 function habitKey(e,el){if(e.key!=='Enter')return;e.preventDefault();const v=el.value.trim();if(!v)return;odata.daily.push(v);el.value='';focusSel='.addinput[data-h="daily"]';osave();renderOrg();}
@@ -1323,7 +1329,7 @@ function habitOver(e,i){if(hDrag===null)return;e.preventDefault();const r=e.curr
 function clearHMarks(){document.querySelectorAll('#o-today .hrow').forEach(r=>r.classList.remove('drop-above','drop-below'));}
 function habitDrop(e,i){if(hDrag===null)return;e.preventDefault();clearHMarks();if(hDrag!==i){const m=odata.daily.splice(hDrag,1)[0];odata.daily.splice(i,0,m);osave();renderOrg();}hDrag=null;}
 /* reminder lists (morning routine + principles) — editable, no ticking */
-function reminderRow(k,i){return `<div class="hrow"><span class="htext" contenteditable="true" onblur="editStr('${k}',${i},this.innerText)">${esc(odata[k][i])}</span><span class="rowx" onclick="delStr('${k}',${i})">✕</span></div>`;}
+function reminderRow(k,i){return `<div class="hrow"><span class="htext" onclick="dgEdit(this)" onblur="editStr('${k}',${i},this.innerText)">${esc(odata[k][i])}</span><span class="rowx" onclick="delStr('${k}',${i})">✕</span></div>`;}
 function editStr(k,i,val){val=(val||'').trim();if(!val)return;odata[k][i]=val;osave();suppressFocus=true;renderToday();suppressFocus=false;}
 function delStr(k,i){odata[k].splice(i,1);osave();suppressFocus=true;renderToday();suppressFocus=false;renderPersonal();}
 function addStr(e,k,el){if(e.key!=='Enter')return;e.preventDefault();const v=el.value.trim();if(!v)return;odata[k].push(v);el.value='';focusSel='.addinput[data-s="'+k+'"]';osave();suppressFocus=true;renderToday();suppressFocus=false;renderPersonal();}
@@ -1372,7 +1378,7 @@ function projDrop(e,i){if(pDrag===null)return;e.preventDefault();clearProjMarks(
 function taskRow(c,gi,noCheck){const sec=getSection(odata.board.order[gi]);return `<div class="task ${c.done?'done':''} ${c.doing?'doing':''} ${c.note?'has-note':''}" data-id="${c.id}" data-dg="task" data-dk="${c.id}" ondragover="taskOver(event,'${c.id}')" ondrop="taskDrop(event,${gi},'${c.id}')">
   <span class="tgrip" draggable="true" ondragstart="taskDragStart(event,'${c.id}',${gi})" ondragend="taskDragEnd(event)">⠿</span>
   ${noCheck?'':`<span class="tchk ${c.done?'on':''}" onclick="toggleCardDone('${c.id}')"></span>`}
-  <span class="ttext ${c.done?'done':''}" contenteditable="true" onblur="editCard('${c.id}',this.innerText)">${esc(c.text)}</span>
+  <span class="ttext ${c.done?'done':''}" onclick="dgEdit(this)" onblur="editCard('${c.id}',this.innerText)">${esc(c.text)}</span>
   <span class="tflag ${c.doing?'on':''}" onclick="toggleDoing('${c.id}')" title="Mark in progress">⚑</span>
   <span class="tnotebtn" onclick="toggleNote('${c.id}')" title="Note">🗒</span>
   ${sec!=='today'?`<span class="ttoday ${c.today?'on':''}" onclick="toggleToday('${c.id}')" title="${c.today?'On Today':'Add to Today'}">➜</span>`:''}
@@ -1386,7 +1392,7 @@ function toggleNote(id){const row=document.querySelector('.task[data-id="'+id+'"
 function toggleToday(id){const c=findCard(id);if(c){c.today=!c.today;osave();renderProjects();}}
 function completeFromToday(id){for(const col of odata.board.order){const a=odata.board.lists[col];const i=a.findIndex(x=>x.id===id);if(i>=0){a.splice(i,1);break;}}osave();renderProjects();toast('Done & cleared ✓');}
 /* ---- orders / refunds trackers ---- */
-function simpleRow(key,it){return `<div class="hrow ${it.done?'done':''}"><span class="chk ${it.done?'on':''}" onclick="toggleSimple('${key}','${it.id}')"></span><span class="htext" contenteditable="true" onblur="editSimple('${key}','${it.id}',this.innerText)">${esc(it.text)}</span><span class="rowx" onclick="delSimple('${key}','${it.id}')">✕</span></div>`;}
+function simpleRow(key,it){return `<div class="hrow ${it.done?'done':''}"><span class="chk ${it.done?'on':''}" onclick="toggleSimple('${key}','${it.id}')"></span><span class="htext" onclick="dgEdit(this)" onblur="editSimple('${key}','${it.id}',this.innerText)">${esc(it.text)}</span><span class="rowx" onclick="delSimple('${key}','${it.id}')">✕</span></div>`;}
 function addSimple(e,key,el){if(e.key!=='Enter')return;e.preventDefault();const v=el.value.trim();if(!v)return;odata[key].push({id:uid(),text:v,done:false});el.value='';focusSel='.addinput[data-simple="'+key+'"]';osave();renderPersonal();}
 function toggleSimple(key,id){const it=odata[key].find(x=>x.id===id);if(it){it.done=!it.done;osave();renderPersonal();}}
 function editSimple(key,id,val){const it=odata[key].find(x=>x.id===id);if(it){it.text=(val||'').trim();osave();}}
@@ -1409,7 +1415,7 @@ function projPanel(gi){
         <span class="proj-count">${op} open${dn?' · '+dn+' done':''}</span>
         <span class="proj-ring" style="--p:${prog}" title="${prog}% done"></span>
         <span class="proj-del" onclick="delColAt(${gi})" title="Delete">✕</span></span></div>
-    <div class="proj-body" ondragover="bodyOver(event)" ondrop="bodyDrop(event,${gi})">
+    <div class="proj-body" data-sortable="task" ondragover="bodyOver(event)" ondrop="bodyDrop(event,${gi})">
       ${cards.map(c=>taskRow(c,gi)).join('')}
       <div class="addbar"><input class="taskadd" data-col="${gi}" placeholder="+ Add a task" onkeydown="addCardInput(event,${gi},this)"><button class="addgo" onclick="addGo(this)" title="Add">+</button></div></div>
   </div>`;
@@ -1426,7 +1432,7 @@ function renderBoard(){
   if(!shown.length){cols='<div class="reminder" style="text-align:center;padding:22px">No businesses selected — tap one above to show it.</div>';}
   else{cols='<div class="bizcols">'+shown.map(b=>{
     const gi=odata.board.order.indexOf(b),cards=odata.board.lists[b]||[];
-    return `<div class="panel bizcol">
+    return `<div class="panel bizcol" data-sortable="task">
       <div class="panel-head"><h2 style="flex:1"><input class="bizname" value="${esc(b)}" onchange="renameBusiness('${jb(b)}',this.value)"></h2>
         <span class="proj-meta"><span class="bizdel" onclick="delBusiness('${jb(b)}')" title="Remove business">✕</span></span></div>
       ${cards.map(c=>taskRow(c,gi,true)).join('')}
@@ -1434,7 +1440,7 @@ function renderBoard(){
   }).join('')+'</div>';}
   const otherIdx=odata.board.order.map((c,i)=>i).filter(i=>getSection(odata.board.order[i])==='business'&&!bizs.includes(odata.board.order[i]));
   const other=otherIdx.length?`<div class="osec" style="margin-top:24px;opacity:.65">Other lists</div>`+otherIdx.map(i=>projPanel(i)).join(''):'';
-  const stats=shown.length?`<div class="bizstats">${shown.map(b=>{const cs=odata.board.lists[b]||[];const op=cs.length,doing=cs.filter(c=>c.doing).length;return `<div class="panel bizstat" data-dg="biz" data-dk="${esc(b)}" data-axis="x" title="Hold and drag to reorder"><div class="bsnum">${op}</div><div class="bsinfo"><div class="bsname">${esc(b)}</div><div class="bssub">${op?`open task${op===1?'':'s'}${doing?` · ${doing} in progress`:''}`:'No tasks yet'}</div></div></div>`;}).join('')}</div>`:'';
+  const stats=shown.length?`<div class="bizstats" data-sortable="biz">${shown.map(b=>{const cs=odata.board.lists[b]||[];const op=cs.length,doing=cs.filter(c=>c.doing).length;return `<div class="panel bizstat" data-dg="biz" data-dk="${esc(b)}" data-axis="x" title="Hold and drag to reorder"><div class="bsnum">${op}</div><div class="bsinfo"><div class="bsname">${esc(b)}</div><div class="bssub">${op?`open task${op===1?'':'s'}${doing?` · ${doing} in progress`:''}`:'No tasks yet'}</div></div></div>`;}).join('')}</div>`:'';
   el.innerHTML=stats+sel+cols+other;
   doFocus();
 }
@@ -1478,7 +1484,7 @@ function renderPersonal(){
       </div>
     </div></div>`;
   const cardsFlat=[];idx.forEach(i=>{(odata.board.lists[odata.board.order[i]]||[]).forEach(c=>cardsFlat.push({c,gi:i}));});
-  const todos=`<div class="osec">Personal to-do list</div><div class="panel">${cardsFlat.map(o=>taskRow(o.c,o.gi)).join('')}<div class="addbar"><input class="taskadd" data-personal="1" placeholder="+ Add a to-do" onkeydown="addPersonalTask(event,this)"><button class="addgo" onclick="addGo(this)" title="Add">+</button></div></div>`;
+  const todos=`<div class="osec">Personal to-do list</div><div class="panel" data-sortable="task">${cardsFlat.map(o=>taskRow(o.c,o.gi)).join('')}<div class="addbar"><input class="taskadd" data-personal="1" placeholder="+ Add a to-do" onkeydown="addPersonalTask(event,this)"><button class="addgo" onclick="addGo(this)" title="Add">+</button></div></div>`;
   const orders=`<div class="osec">Orders${ordersOpen?`<span class="osec-meta">${ordersOpen} open</span>`:''}</div><div class="panel">${odata.orders.map(it=>simpleRow('orders',it)).join('')}
       <div class="addbar"><input class="addinput" data-simple="orders" placeholder="+ Add an order" onkeydown="addSimple(event,'orders',this)"><button class="addgo" onclick="addGo(this)" title="Add">+</button></div></div>`;
   const returns=`<div class="osec">Returns${returnsOpen?`<span class="osec-meta">${returnsOpen} open</span>`:''}</div><div class="panel">${odata.returns.map(it=>simpleRow('returns',it)).join('')}
@@ -1542,7 +1548,7 @@ function renderGoals(){
     const dn=list.filter(g=>goalProgress(g)>=1).length;
     const colPct=list.length?Math.round(list.reduce((s,g)=>s+goalProgress(g),0)/list.length*100):0;
     const addCtl=locked?'':(list.length>=3?'<div class="goalmax">Max 3 this quarter</div>':`<button class="projadd goalcol-add" onclick="addGoal('${jb(a)}')">+ Add goal</button>`);
-    return `<div class="goalcol"><div class="goalcol-head"><div class="goalcol-h"><span>${esc(a)}</span><span class="meta">${list.length?dn+'/'+list.length+' · '+colPct+'%':'—'}</span></div><div class="goalcol-bar"><div class="goalcol-fill" style="width:${colPct}%"></div></div></div>${list.map(g=>goalCard(g,locked)).join('')}${addCtl}</div>`;
+    return `<div class="goalcol" data-sortable="goal"><div class="goalcol-head"><div class="goalcol-h"><span>${esc(a)}</span><span class="meta">${list.length?dn+'/'+list.length+' · '+colPct+'%':'—'}</span></div><div class="goalcol-bar"><div class="goalcol-fill" style="width:${colPct}%"></div></div></div>${list.map(g=>goalCard(g,locked)).join('')}${addCtl}</div>`;
   }).join('')}</div>`;
   el.innerHTML=qbar+stats+(lockMsg?`<div class="glockmsg">🔒 ${lockMsg}</div>`:'')+cols;
   doFocus();
@@ -1572,7 +1578,7 @@ function goalCard(g,locked){
   }
   const doneToggle=(!(g.target>0)&&!editing)?`<span class="chk ${g.done?'on':''}" onclick="toggleGoalDone('${g.id}')" title="Mark done"></span>`:'';
   return `<div class="panel goalcard ${complete?'complete':''}" data-dg="goal" data-dk="${g.id}" ondragover="goalOver(event,'${g.id}')" ondrop="goalDrop(event,'${g.id}')">
-    <div class="goal-top"><span class="ggrip" draggable="true" ondragstart="goalDragStart(event,'${g.id}')" ondragend="goalDragEnd(event)" title="Drag to reorder">⠿</span>${doneToggle}<span class="goal-title" data-gid="${g.id}" contenteditable="true" onblur="editGoalField('${g.id}','title',this.innerText)">${esc(g.title)}</span><span class="goal-del" onclick="delGoal2('${g.id}')">✕</span></div>
+    <div class="goal-top"><span class="ggrip" draggable="true" ondragstart="goalDragStart(event,'${g.id}')" ondragend="goalDragEnd(event)" title="Drag to reorder">⠿</span>${doneToggle}<span class="goal-title" data-gid="${g.id}" onclick="dgEdit(this)" onblur="editGoalField('${g.id}','title',this.innerText)">${esc(g.title)}</span><span class="goal-del" onclick="delGoal2('${g.id}')">✕</span></div>
     <div class="goal-progwrap"><div class="goal-prog" style="width:${pct}%"></div></div>
     <div class="goal-row"><span class="goal-pct">${pct}%</span>${detail}</div></div>`;
 }
@@ -1698,7 +1704,7 @@ function renderGym(){
         <button class="otab" data-g="g-programs">Weight Programs</button>
       </div>
       <section class="oview active" id="g-train"></section>
-      <section class="oview" id="g-programs"></section>`;
+      <section class="oview" id="g-programs" data-sortable="program"></section>`;
     root.querySelectorAll('.otab').forEach(t=>t.onclick=()=>{
       root.querySelectorAll('.otab').forEach(x=>x.classList.remove('active'));
       root.querySelectorAll('.oview').forEach(x=>x.classList.remove('active'));
@@ -1794,8 +1800,8 @@ function renderPrograms(){
     const cores=p.exercises.map((ex,i)=>({ex,i})).filter(o=>o.ex.core);
     const single=!!p.single;
     const opt=(o,L,sF,rF)=>`<span class="gset" title="Option ${L}">${L?'<b class="gab">'+L+'</b>':''}<input class="gnum" value="${esc(o.ex[sF])}" placeholder="sets" onchange="editProgEx('${p.id}',${o.i},'${sF}',this.value)">×<input class="gnum" value="${esc(o.ex[rF])}" placeholder="reps" onchange="editProgEx('${p.id}',${o.i},'${rF}',this.value)"></span>`;
-    const liftRow=o=>`<div class="hrow"><span class="htext" contenteditable="true" onblur="editProgEx('${p.id}',${o.i},'name',this.innerText)">${esc(o.ex.name)}</span>${single?opt(o,'','setsA','repsA'):opt(o,'A','setsA','repsA')+opt(o,'B','setsB','repsB')}<span class="rowx" onclick="delProgEx('${p.id}',${o.i})">✕</span></div>`;
-    const coreRow=o=>`<div class="hrow"><span class="htext" contenteditable="true" onblur="editProgEx('${p.id}',${o.i},'name',this.innerText)">${esc(o.ex.name)}</span><span class="gset"><input class="gnum" value="${esc(o.ex.mins)}" placeholder="min" onchange="editProgEx('${p.id}',${o.i},'mins',this.value)">min</span><span class="rowx" onclick="delProgEx('${p.id}',${o.i})">✕</span></div>`;
+    const liftRow=o=>`<div class="hrow"><span class="htext" onclick="dgEdit(this)" onblur="editProgEx('${p.id}',${o.i},'name',this.innerText)">${esc(o.ex.name)}</span>${single?opt(o,'','setsA','repsA'):opt(o,'A','setsA','repsA')+opt(o,'B','setsB','repsB')}<span class="rowx" onclick="delProgEx('${p.id}',${o.i})">✕</span></div>`;
+    const coreRow=o=>`<div class="hrow"><span class="htext" onclick="dgEdit(this)" onblur="editProgEx('${p.id}',${o.i},'name',this.innerText)">${esc(o.ex.name)}</span><span class="gset"><input class="gnum" value="${esc(o.ex.mins)}" placeholder="min" onchange="editProgEx('${p.id}',${o.i},'mins',this.value)">min</span><span class="rowx" onclick="delProgEx('${p.id}',${o.i})">✕</span></div>`;
     const open=!!(gdata.progOpen&&gdata.progOpen[p.id]);
     return `<div class="panel gprogpanel ${open?'open':''}" data-dg="program" data-dk="${p.id}" ondragover="gpOver(event,${pidx})" ondrop="gpDrop(event,${pidx})"><div class="panel-head" onclick="if(!event.target.closest('input,.rowx,.gpgrip'))toggleProgCollapse('${p.id}')">
       <span class="gpgrip" draggable="true" ondragstart="gpDragStart(event,${pidx})" ondragend="gpEnd(event)" title="Drag to reorder">⠿</span>
@@ -2059,49 +2065,30 @@ renderCal();
 </script>
 
 <script>
-/* ============ DRAG-ANYWHERE REORDER (touch + mouse, press-hold) ============ */
-(function(){
-  var EXCLUDE='button,a,.chk,.tchk,.rowx,.tx,.tflag,.tnotebtn,.ttoday,.proj-del,.bizdel,.goal-del,.goal-tgtdel,.goal-tgtval,.goal-stepper,.proj-move,.proj-chev,.gcal-nav,.qnav,.del,.glink,.gcomplete,[draggable="true"]';
-  var holdT=null,pend=null,drag=null,sx=0,sy=0,axis='y',ptype='mouse';
-  function sibs(el){var g=el.getAttribute('data-dg'),p=el.parentNode;if(!p)return [el];return Array.prototype.filter.call(p.children,function(c){return c.nodeType===1&&c.getAttribute&&c.getAttribute('data-dg')===g;});}
-  function clearPend(){if(holdT){clearTimeout(holdT);holdT=null;}pend=null;}
-  function onDown(e){
-    if(e.pointerType==='mouse'&&e.button!==0)return;
-    var t=e.target;if(!t||!t.closest)return;
-    if(t.closest(EXCLUDE))return;
-    var item=t.closest('[data-dg]');if(!item)return;
-    pend=item;sx=e.clientX;sy=e.clientY;ptype=e.pointerType||'mouse';axis=item.getAttribute('data-axis')==='x'?'x':'y';
-    if(ptype!=='mouse')holdT=setTimeout(function(){holdT=null;begin(item);},340);
-  }
-  function begin(item){drag=item;item.classList.add('dgdrag');document.body.classList.add('dgactive');if(document.activeElement&&document.activeElement.blur){try{document.activeElement.blur();}catch(x){}}try{navigator.vibrate&&navigator.vibrate(8);}catch(x){}}
-  function onMove(e){
-    if(!drag){
-      if(!pend)return;
-      var moved=Math.abs(e.clientX-sx)>5||Math.abs(e.clientY-sy)>5;
-      if(ptype==='mouse'){if(!moved)return;begin(pend);}
-      else{if(moved)clearPend();return;}
-    }
-    if(!drag)return;
-    e.preventDefault();
-    var list=sibs(drag),p=axis==='x'?e.clientX:e.clientY,before=null;
-    for(var i=0;i<list.length;i++){var s=list[i];if(s===drag)continue;var r=s.getBoundingClientRect();var mid=axis==='x'?r.left+r.width/2:r.top+r.height/2;if(p<mid){before=s;break;}}
-    if(before){if(drag.nextSibling!==before)drag.parentNode.insertBefore(drag,before);}
-    else{var last=list[list.length-1];if(last&&last!==drag)drag.parentNode.appendChild(drag);}
-  }
-  function onUp(){
-    if(drag){var item=drag;drag=null;item.classList.remove('dgdrag');document.body.classList.remove('dgactive');
-      var g=item.getAttribute('data-dg');var keys=sibs(item).map(function(s){return s.getAttribute('data-dk');});
-      var sup=function(ev){ev.stopPropagation();ev.preventDefault();document.removeEventListener('click',sup,true);};
-      document.addEventListener('click',sup,true);setTimeout(function(){document.removeEventListener('click',sup,true);},350);
-      if(window.DRAGH&&window.DRAGH[g]){try{window.DRAGH[g](keys,item);}catch(err){}}
-    }
-    clearPend();
-  }
-  document.addEventListener('pointerdown',onDown,true);
-  document.addEventListener('pointermove',onMove,{passive:false});
-  document.addEventListener('pointerup',onUp,true);
-  document.addEventListener('pointercancel',function(){if(drag){drag.classList.remove('dgdrag');document.body.classList.remove('dgactive');drag=null;}clearPend();},true);
-})();
+/* ============ DRAG REORDER via SortableJS (touch long-press + mouse) ============ */
+var DG_FILTER='input,textarea,select,button,a,[contenteditable="true"],.chk,.tchk,.rowx,.tx,.tflag,.tnotebtn,.ttoday,.proj-del,.bizdel,.goal-del,.goal-tgtdel,.goal-tgtval,.goal-stepper,.proj-move,.proj-chev,.gcal-nav,.qnav,.del,.glink,.gcomplete,.addgo,.addinput,.taskadd,.bizname,.proj-name';
+window._dgDragging=false;
+function initSortables(){
+  if(typeof Sortable==='undefined'||window._dgDragging)return;
+  document.querySelectorAll('[data-sortable]').forEach(function(c){
+    if(c._sortable)return;
+    var grp=c.getAttribute('data-sortable');
+    c.querySelectorAll('[draggable="true"]').forEach(function(g){g.setAttribute('draggable','false');});
+    try{c._sortable=new Sortable(c,{
+      draggable:'[data-dg="'+grp+'"]',
+      filter:DG_FILTER,preventOnFilter:false,
+      forceFallback:true,
+      delay:180,delayOnTouchOnly:true,touchStartThreshold:8,
+      animation:150,fallbackOnBody:true,
+      chosenClass:'dgchosen',ghostClass:'dgghost',dragClass:'dgdragging',
+      onStart:function(){window._dgDragging=true;},
+      onEnd:function(evt){window._dgDragging=false;var keys=[];evt.to.querySelectorAll(':scope > [data-dg="'+grp+'"]').forEach(function(e){keys.push(e.getAttribute('data-dk'));});var it=evt.item;setTimeout(function(){if(window.DRAGH&&window.DRAGH[grp]){try{window.DRAGH[grp](keys,it);}catch(err){}}},0);}
+    });}catch(e){}
+  });
+}
+var _dgMO=new MutationObserver(function(){clearTimeout(window._dgT);window._dgT=setTimeout(initSortables,90);});
+function dgStart(){if(document.body){_dgMO.observe(document.body,{childList:true,subtree:true});initSortables();}else setTimeout(dgStart,50);}
+dgStart();
 </script>
 
 <script>
